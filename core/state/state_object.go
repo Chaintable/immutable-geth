@@ -74,6 +74,7 @@ type stateObject struct {
 	originStorage  Storage // Storage cache of original entries to dedup rewrites
 	pendingStorage Storage // Storage entries that need to be flushed to disk, at the end of an entire block
 	dirtyStorage   Storage // Storage entries that have been modified in the current transaction execution, reset for every transaction
+	commitStorage  Storage // Storage entries committed in the block, used for tracing
 
 	// Cache flags.
 	dirtyCode bool // true if the code was updated
@@ -114,6 +115,7 @@ func newObject(db *StateDB, address common.Address, acct *types.StateAccount) *s
 		originStorage:  make(Storage),
 		pendingStorage: make(Storage),
 		dirtyStorage:   make(Storage),
+		commitStorage:  make(Storage),
 		created:        created,
 	}
 }
@@ -256,6 +258,7 @@ func (s *stateObject) finalise(prefetch bool) {
 	slotsToPrefetch := make([][]byte, 0, len(s.dirtyStorage))
 	for key, value := range s.dirtyStorage {
 		s.pendingStorage[key] = value
+		s.commitStorage[key] = value
 		if value != s.originStorage[key] {
 			slotsToPrefetch = append(slotsToPrefetch, common.CopyBytes(key[:])) // Copy needed for closure
 		}
@@ -453,6 +456,7 @@ func (s *stateObject) deepCopy(db *StateDB) *stateObject {
 	obj.dirtyStorage = s.dirtyStorage.Copy()
 	obj.originStorage = s.originStorage.Copy()
 	obj.pendingStorage = s.pendingStorage.Copy()
+	obj.commitStorage = s.commitStorage.Copy()
 	obj.selfDestructed = s.selfDestructed
 	obj.dirtyCode = s.dirtyCode
 	obj.deleted = s.deleted
