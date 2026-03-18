@@ -82,6 +82,7 @@ func (api *DebankAPI) DebankBlock(ctx context.Context, blockNrOrHash rpc.BlockNu
 	}
 
 	rpcTracer.OnBlockStart(block)
+	statedb.OnLog = rpcTracer.OnLog
 
 	chainConfig := api.eth.blockchain.Config()
 
