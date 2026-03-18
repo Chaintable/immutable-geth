@@ -103,6 +103,10 @@ type StateDB struct {
 	logs    map[common.Hash][]*types.Log
 	logSize uint
 
+	// OnLog is an optional callback invoked for each log emitted during execution.
+	// Used by trace_debankBlock to forward logs to the RPCTracer.
+	OnLog func(*types.Log)
+
 	// Preimages occurred seen by VM in the scope of block.
 	preimages map[common.Hash][]byte
 
@@ -215,6 +219,9 @@ func (s *StateDB) AddLog(log *types.Log) {
 	log.Index = s.logSize
 	s.logs[s.thash] = append(s.logs[s.thash], log)
 	s.logSize++
+	if s.OnLog != nil {
+		s.OnLog(log)
+	}
 }
 
 // GetLogs returns the logs matching the specified transaction hash, and annotates

@@ -3,15 +3,18 @@ package eth
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	ptracer "github.com/Chaintable/pipeline/tracer"
 	ptypes "github.com/Chaintable/pipeline/types"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/Chaintable/pipeline/util"
 )
 
 type DebankAPI struct {
@@ -31,7 +34,37 @@ func (api *DebankAPI) DebankBlock(ctx context.Context, blockNrOrHash rpc.BlockNu
 		return nil, fmt.Errorf("block not found")
 	}
 	if block.NumberU64() == 0 {
-		return nil, fmt.Errorf("genesis block trace not supported")
+		genesis := api.eth.config.Genesis
+		if genesis == nil {
+			return nil, fmt.Errorf("genesis config not available")
+		}
+		header := util.BuildPilelineBlockHeader(block)
+		blockDiff := ptracer.GenesisAllocToStateDiff(genesis.Alloc)
+		blockDiff.Hash = header.StateRoot
+		blockFile := &ptypes.BlockFile{
+			Block:            util.BuildPipelineBlock(block),
+			Txs:              make([]ptypes.Transaction, 0),
+			Events:           make([]ptypes.Event, 0),
+			Traces:           make([]ptypes.Trace, 0),
+			ErrorEvents:      make([]ptypes.Event, 0),
+			ErrorTraces:      make([]ptypes.Trace, 0),
+			StorageContracts: make([]string, 0),
+		}
+		for addr, account := range genesis.Alloc {
+			if len(account.Storage) > 0 {
+				blockFile.StorageContracts = append(blockFile.StorageContracts, strings.ToLower(addr.Hex()))
+			}
+		}
+		stateDiffBytes, err := util.EncodeToRlp(blockDiff)
+		if err != nil {
+			stateDiffBytes = []byte{}
+		}
+		return &ptypes.DebankOutPut{
+			BlockFile:      blockFile,
+			Header:         header,
+			StateDiff:      hexutil.Bytes(stateDiffBytes),
+			ValidationHash: blockFile.Validation().ValidationHash,
+		}, nil
 	}
 
 	parent := api.eth.blockchain.GetBlock(block.ParentHash(), block.NumberU64()-1)
@@ -49,6 +82,7 @@ func (api *DebankAPI) DebankBlock(ctx context.Context, blockNrOrHash rpc.BlockNu
 	}
 
 	rpcTracer.OnBlockStart(block)
+	statedb.OnLog = rpcTracer.OnLog
 
 	chainConfig := api.eth.blockchain.Config()
 
