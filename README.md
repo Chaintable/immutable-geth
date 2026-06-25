@@ -1,3 +1,24 @@
+# Chaintable write node
+
+> Fork of [ethereum/go-ethereum](https://github.com/ethereum/go-ethereum), with Chaintable pipeline patches.
+
+## Architecture
+
+This repo runs the chain's execution layer with the [Chaintable pipeline](https://github.com/Chaintable/pipeline) tracer embedded. The tracer extracts block data — block headers, transactions, call traces, receipts, events, and state diffs — and ships it to **S3 + Kafka** (see pipeline's [architecture](https://github.com/Chaintable/pipeline/blob/main/docs/architecture.md)). Two consumption paths:
+
+- **Block headers + state diffs** → Kafka + S3 → [leafage-evm](https://github.com/Chaintable/leafage-evm): a lightweight EVM executor serving state queries (`eth_call`, `eth_estimateGas`, …), no P2P sync, no tx storage (see its [architecture](https://github.com/Chaintable/leafage-evm#architecture)).
+- **Block files** (transactions · call traces · receipts · events) → S3 → Chaintable's transaction/trace indexing pipeline.
+
+```
+Chaintable write node (this repo · producer, embeds pipeline tracer)
+        │
+        ├─ block headers + state diffs ──────────────────→ Kafka + S3 ─→ leafage-evm (EVM state queries)
+        │
+        └─ block files (tx · trace · receipts · events) ──→ S3 ─→ Chaintable indexing pipeline (tx/trace data)
+```
+
+---
+
 # Immutable Geth
 
 Golang execution layer implementation of the Ethereum protocol. Modified for the purposes of the Immutable zkEVM.
@@ -36,10 +57,7 @@ You can run the E2E tests against your built binary via:
 
 ## Docker
 
-The client is distributed as the following Docker image:
-```
-docker pull ghcr.io/immutable/go-ethereum/go-ethereum:latest
-```
+Chaintable CI builds this write node and publishes the Docker image to Chaintable's public ECR registry. Released binaries are published at [Chaintable/immutable-geth/releases](https://github.com/Chaintable/immutable-geth/releases).
 
 ## Run
 
