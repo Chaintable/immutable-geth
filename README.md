@@ -57,7 +57,10 @@ You can run the E2E tests against your built binary via:
 
 ## Docker
 
-Chaintable CI builds this write node and publishes the Docker image to Chaintable's public ECR registry. Released binaries are published at [Chaintable/immutable-geth/releases](https://github.com/Chaintable/immutable-geth/releases).
+The client is distributed as the following Docker image:
+```
+docker pull ghcr.io/immutable/go-ethereum/go-ethereum:latest
+```
 
 ## Run
 
